@@ -91,6 +91,22 @@ func (np *NatsProtoo) OnBroadcast(channel string, listener BroadCastFunc) {
 	}
 }
 
+func (np *NatsProtoo) OnBroadcastWithGroup(channel, group string, listener BroadCastFunc) {
+	np.mutex.Lock()
+	defer np.mutex.Unlock()
+
+	if _, found := np.broadcastListeners[channel]; !found {
+		np.nc.QueueSubscribe(channel, group, np.onRequest)
+		np.nc.Flush()
+		np.broadcastListeners[channel] = make([]BroadCastFunc, 0)
+	}
+
+	if !listenerIsContain(np.broadcastListeners[channel], listener) {
+		logger.Debugf("OnBroadcast: [channel:%s, listener:%v]", channel, listener)
+		np.broadcastListeners[channel] = append(np.broadcastListeners[channel], listener)
+	}
+}
+
 func (np *NatsProtoo) onRequest(msg *nats.Msg) {
 	logger.Debugf("Got request [subj:%s, reply:%s]: %s", msg.Subject, msg.Reply, string(msg.Data))
 	np.handleMessage(msg.Data, msg.Subject, msg.Reply)
